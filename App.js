@@ -1,67 +1,133 @@
 import * as React from 'react';
-import { Platform, StatusBar, StyleSheet, View } from 'react-native';
-import { SplashScreen } from 'expo';
-import * as Font from 'expo-font';
-import { Ionicons } from '@expo/vector-icons';
-import { NavigationContainer } from '@react-navigation/native';
-import { createStackNavigator } from '@react-navigation/stack';
+import {
+  StyleSheet,
+  Text,
+  View,
+  TouchableOpacity,
+  Platform
+} from "react-native";
+import { Camera } from "expo-camera";
+import * as Permissions from "expo-permissions";
+import {
+  FontAwesome,
+  Ionicons,
+  MaterialCommunityIcons
+} from "@expo/vector-icons";
+import * as ImagePicker from "expo-image-picker";
 
-import BottomTabNavigator from './navigation/BottomTabNavigator';
-import useLinking from './navigation/useLinking';
+export default class App extends React.Component {
+  state = {
+    hasPermission: null,
+    cameraType: Camera.Constants.Type.back
+  };
 
-const Stack = createStackNavigator();
+  async componentDidMount() {
+    this.getPermissionAsync();
+  }
 
-export default function App(props) {
-  const [isLoadingComplete, setLoadingComplete] = React.useState(false);
-  const [initialNavigationState, setInitialNavigationState] = React.useState();
-  const containerRef = React.useRef();
-  const { getInitialState } = useLinking(containerRef);
-
-  // Load any resources or data that we need prior to rendering the app
-  React.useEffect(() => {
-    async function loadResourcesAndDataAsync() {
-      try {
-        SplashScreen.preventAutoHide();
-
-        // Load our initial navigation state
-        setInitialNavigationState(await getInitialState());
-
-        // Load fonts
-        await Font.loadAsync({
-          ...Ionicons.font,
-          'space-mono': require('./assets/fonts/SpaceMono-Regular.ttf'),
-        });
-      } catch (e) {
-        // We might want to provide this error information to an error reporting service
-        console.warn(e);
-      } finally {
-        setLoadingComplete(true);
-        SplashScreen.hide();
+  getPermissionAsync = async () => {
+    // Camera roll Permission
+    if (Platform.OS === "ios") {
+      const { status } = await Permissions.askAsync(Permissions.CAMERA_ROLL);
+      if (status !== "granted") {
+        alert("Sorry, we need camera roll permissions to make this work!");
       }
     }
+    // Camera Permission
+    const { status } = await Permissions.askAsync(Permissions.CAMERA);
+    this.setState({ hasPermission: status === "granted" });
+  };
 
-    loadResourcesAndDataAsync();
-  }, []);
+  handleCameraType = () => {
+    const { cameraType } = this.state;
 
-  if (!isLoadingComplete && !props.skipLoadingScreen) {
-    return null;
-  } else {
-    return (
-      <View style={styles.container}>
-        {Platform.OS === 'ios' && <StatusBar barStyle="default" />}
-        <NavigationContainer ref={containerRef} initialState={initialNavigationState}>
-          <Stack.Navigator>
-            <Stack.Screen name="Root" component={BottomTabNavigator} />
-          </Stack.Navigator>
-        </NavigationContainer>
-      </View>
-    );
+    this.setState({
+      cameraType:
+        cameraType === Camera.Constants.Type.back
+          ? Camera.Constants.Type.front
+          : Camera.Constants.Type.back
+    });
+  };
+
+  takePicture = async () => {
+    if (this.camera) {
+      let photo = await this.camera.takePictureAsync();
+    }
+  };
+
+  pickImage = async () => {
+    let result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images
+    });
+  };
+
+  render() {
+    const { hasPermission } = this.state;
+    if (hasPermission === null) {
+      return <View />;
+    } else if (hasPermission === false) {
+      return <Text>No access to camera</Text>;
+    } else {
+      return (
+        <View style={{ flex: 1 }}>
+          <Camera
+            style={{ flex: 1 }}
+            type={this.state.cameraType}
+            ref={ref => {
+              this.camera = ref;
+            }}
+          >
+            <View
+              style={{
+                flex: 1,
+                flexDirection: "row",
+                justifyContent: "space-between",
+                margin: 30
+              }}
+            >
+              <TouchableOpacity
+                style={{
+                  alignSelf: "flex-end",
+                  alignItems: "center",
+                  backgroundColor: "transparent"
+                }}
+                onPress={() => this.pickImage()}
+              >
+                <Ionicons
+                  name="ios-photos"
+                  style={{ color: "#fff", fontSize: 40 }}
+                />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={{
+                  alignSelf: "flex-end",
+                  alignItems: "center",
+                  backgroundColor: "transparent"
+                }}
+                onPress={() => this.takePicture()}
+              >
+                <FontAwesome
+                  name="camera"
+                  style={{ color: "#fff", fontSize: 40 }}
+                />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={{
+                  alignSelf: "flex-end",
+                  alignItems: "center",
+                  backgroundColor: "transparent"
+                }}
+                onPress={() => this.handleCameraType()}
+              >
+                <MaterialCommunityIcons
+                  name="camera-switch"
+                  style={{ color: "#fff", fontSize: 40 }}
+                />
+              </TouchableOpacity>
+            </View>
+          </Camera>
+        </View>
+      );
+    }
   }
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
-});
